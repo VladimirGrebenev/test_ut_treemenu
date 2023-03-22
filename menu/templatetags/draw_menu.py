@@ -20,8 +20,8 @@ def draw_menu(context, menu):
     """
     try:
         items = Item.objects.filter(menu__title=menu)
-        items_values = items.values()
-        primary_item = [item for item in items_values.filter(parent=None)]
+        # items_values = items.values()
+        primary_item = [item for item in items.values().filter(parent=None)]
         selected_item_id = int(context['request'].GET[menu])
         selected_item = items.get(id=selected_item_id)
         selected_item_id_list = get_selected_item_id_list(selected_item,
@@ -30,7 +30,8 @@ def draw_menu(context, menu):
 
         for item in primary_item:
             if item['id'] in selected_item_id_list:
-                item['child_items'] = get_child_items(items_values, item['id'],
+                item['child_items'] = get_child_items(items.values(),
+                                                      item['id'],
                                                       selected_item_id_list)
         result_dict = {'items': primary_item}  # итоговый dict с пунктами
 
