@@ -1,8 +1,5 @@
-from django.views.generic import TemplateView
-from menu.models import Item
+from django.shortcuts import render
 
-class MainPageView(TemplateView):
-    template_name = "menu/index.html"
-    model = Item
-    queryset = Item.objects.select_related('items').prefetch_related(
-        'childrens').all()
+
+def index(request, item=None):
+    return render(request, 'menu/index.html', {'item': item})
