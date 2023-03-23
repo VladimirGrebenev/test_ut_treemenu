@@ -1,13 +1,10 @@
+{% load draw_menu %}
+{% load static %}
+{% if menu_tree.0.menu_name %}
+<p>{{menu_tree.0.menu_name}}</p>
+{% endif %}
 <ul>
-    {% for item in items %}
-        <li>
-            <a href="?{{ other_querystring }}&{{ menu }}={{ item.id }}">
-                {{ item.title }}</a>
-        </li>
-
-        {% if item.child_items %}
-            {% include 'menu/tree_menu.html' with items=item.child_items %}
-        {% endif %}
-
-    {% endfor %}
+    {% autoescape off %}
+    {% render_menu menu_tree %}
+    {% endautoescape %}
 </ul>

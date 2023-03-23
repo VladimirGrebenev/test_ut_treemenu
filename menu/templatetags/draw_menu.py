@@ -1,6 +1,6 @@
 from django import template
 
-from menu.models import Item
+from menu.models import Item, Menu
 
 register = template.Library()
 
@@ -18,69 +18,88 @@ def draw_menu(context, menu):
     формирования ссылки
 
     """
-    try:
-        items = Item.objects.filter(menu__title=menu)
-        # items_values = items.values()
-        primary_item = [item for item in items.values().filter(parent=None)]
-        selected_item_id = int(context['request'].GET[menu])
-        selected_item = items.get(id=selected_item_id)
-        selected_item_id_list = get_selected_item_id_list(selected_item,
-                                                          primary_item,
-                                                          selected_item_id)
 
-        for item in primary_item:
-            if item['id'] in selected_item_id_list:
-                item['child_items'] = get_child_items(items.values(),
-                                                      item['id'],
-                                                      selected_item_id_list)
-        result_dict = {'items': primary_item}  # итоговый dict с пунктами
+    current_url = context['request'].path
+    menu_items = Item.objects.all().select_related('menu', 'parent').filter(
+        menu__title=menu).order_by('parent_id')
+    sorted_menu_items = []
+    tree = []
 
-    except:
-        result_dict = {
-            'items': [
-                item for item in
-                Item.objects.filter(menu__title=menu, parent=None).values()
-            ]
-        }
+    for item in menu_items:
+        if item.parent_id is None:
+            sorted_menu_items.append(item)
+        else:
+            for i, sort_item in enumerate(sorted_menu_items):
+                if item.parent_id == sort_item.id:
+                    sorted_menu_items.insert(i + 1, item)
 
-    result_dict['menu'] = menu
-    result_dict['other_querystring'] = get_querystring(context, menu)
+    active = True
+    parent_last_id = sorted_menu_items[0].id
+    root_id = sorted_menu_items[0].id
+    for item in sorted_menu_items:
+        if current_url == item.url:
+            parent_last_id = item.parent_id
 
-    return result_dict  # итоговый dict с пунктами и прочими параметрами ссылки
+    last_active_id = sorted_menu_items[0].id
+    for item in sorted_menu_items:
+        tree.append({
+            'id': item.id,
+            'name': item.title,
+            'menu_name': menu,
+            'parent': item.parent_id,
+            'url': item.url if item.url != '' else '/',
+            'active': active,
+        })
+        if active:
+            last_active_id = item.id
+        if item.url == current_url:
+            active = False
+        if item.url == '' and current_url == '/':
+            active = False
 
+    for item in tree:
+        if item['parent'] is None:
+            item['active'] = True
+        elif item['parent'] == last_active_id:
+            item['active'] = True
+        elif item['parent'] == parent_last_id:
+            item['active'] = True
+        elif item['parent'] == root_id:
+            item['active'] = True
+        else:
+            item['active'] = False
 
-def get_querystring(context, menu):
-    """Функция формирования остальных параметров запроса, для формирования
-    ссылки пункта меню"""
-    querystring_args = []
-    for key in context['request'].GET:
-        if key != menu:
-            querystring_args.append(key + '=' + context['request'].GET[key])
-    querystring = ('&').join(querystring_args)
-    return querystring
+    for item in tree:
+        if item['url'] == current_url:
+            item['active'] = True
+            parent_id = item['parent']
+            while parent_id is not None:
+                for parent_item in tree:
+                    if parent_item['id'] == parent_id:
+                        parent_item['active'] = True
+                        parent_id = parent_item['parent']
+                        break
+                else:
+                    parent_id = None
+                if parent_id == 1:
+                    break
+        else:
+            continue
 
+    return {
+        'menu_tree': tree,
+    }
 
-def get_child_items(items_values, current_item_id, selected_item_id_list):
-    """Функция сбора списка пунктов меню нижних уровней выбранного пункта"""
-    item_list = [item for item in
-                 items_values.filter(parent_id=current_item_id)]
-    for item in item_list:
-        if item['id'] in selected_item_id_list:
-            item['child_items'] = get_child_items(items_values, item['id'],
-                                                  selected_item_id_list)
-    return item_list
-
-
-def get_selected_item_id_list(parent, primary_item, selected_item_id):
-    """Функция формирует список id выбранного пункта и его родителей,
-     делает перебор по восходящей проверяя атрибут parent """
-    selected_item_id_list = []
-
-    while parent:
-        selected_item_id_list.append(parent.id)
-        parent = parent.parent
-    if not selected_item_id_list:
-        for item in primary_item:
-            if item['id'] == selected_item_id:
-                selected_item_id_list.append(selected_item_id)
-    return selected_item_id_list
+@register.simple_tag(takes_context=True)
+def render_menu(context, menu_tree, current_item=None):
+    result = ''
+    for item in menu_tree:
+        if item['parent'] == current_item and item['active'] == True:
+            result += f'<li><a href="{item["url"]}" ' \
+                      f'{"class=active" if item["active"] else ""}>' \
+                      f'{item["name"]}</a>'
+            sub_menu = render_menu(context, menu_tree, item['id'])
+            if sub_menu:
+                result += f'<ul>{sub_menu}</ul>'
+            result += '</li>'
+    return result
