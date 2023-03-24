@@ -1,11 +1,9 @@
-from django.conf import settings
 from django.contrib import admin
-from django.urls import path, re_path, include
-from menu.views import index
+
+from django.urls import path, include
 
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('', index, name='index'),
-    re_path(r'^(.*)/$', index, name='index')
+    path('', include('menu.urls')),
 ]
