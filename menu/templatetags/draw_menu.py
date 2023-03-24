@@ -7,6 +7,18 @@ register = template.Library()
 
 @register.inclusion_tag('menu/tree_menu.html', takes_context=True)
 def draw_menu(context, menu):
+    """Шаблонный тег отрисовки древовидного меню, собирает параметры:
+    items - все пункты меню конкретного меню - QuerySet;
+    items_values - значения всех пунктов меню - QuerySet;
+    primary_item - список пунктов меню первого уровня - [{}];
+    selected_item_id - id выбранного пункта меню - int;
+    selected_item - объект выбранного пункта - obj;
+    selected_item_id_list - id выбранного пункта и его родителей;
+    result_dict - итоговый dict с пунктами и прочими параметрами для
+    формирования ссылки
+
+    """
+
     current_url = context['request'].path
     menu_items = Item.objects.all().select_related('menu', 'parent').filter(
         menu__title=menu).order_by('parent_id')
@@ -77,7 +89,6 @@ def draw_menu(context, menu):
     return {
         'menu_tree': tree,
     }
-
 
 @register.simple_tag(takes_context=True)
 def render_menu(context, menu_tree, current_item=None):
